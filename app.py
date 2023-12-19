@@ -8,7 +8,6 @@ from collections import Counter
 from wordcloud import WordCloud
 from streamlit_echarts import st_pyecharts
 import jieba
-import seaborn as sns
 import altair as alt
 from pyecharts.charts import WordCloud as PyWordCloud
 
