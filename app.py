@@ -8,6 +8,8 @@ from collections import Counter
 from wordcloud import WordCloud
 from streamlit_echarts import st_pyecharts
 import jieba
+import seaborn as sns
+import altair as alt
 from pyecharts.charts import WordCloud as PyWordCloud
 
 #根据给定的URL爬取网页内容，并统计网页中出现的中文词汇的次数。
@@ -26,7 +28,44 @@ def crawl_webpage(url):
     matches = re.findall(pattern, text_content)
     counts = Counter(matches)
     return counts
+def generate_seaborn_chart(chart_type, df):
+    if chart_type == '回归图':
+        chart = alt.Chart(df).mark_circle().encode(
+            x='count',
+            y='word',
+            tooltip=['word', 'count']
+        ).properties(
+            width=800,
+            height=600,
+            title='回归图'
+        )
+        st.altair_chart(chart)
 
+    elif chart_type == '直方图':
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X('count:Q', bin=True),
+            y='count()',
+            tooltip=['count()']
+        ).properties(
+            width=800,
+            height=600,
+            title='直方图'
+        )
+        st.altair_chart(chart)
+
+    elif chart_type == '成对关系图':
+        chart = alt.Chart(df).mark_circle().encode(
+            x=alt.X(alt.repeat("column"), type='quantitative'),
+            y=alt.Y(alt.repeat("row"), type='quantitative'),
+            tooltip=['word', 'count']
+        ).properties(
+            width=200,
+            height=200
+        ).repeat(
+            row=['count'],
+            column=['count', 'word']
+        )
+        st.altair_chart(chart)
 def generate_wordcloud(counts):
     #list(counts.keys())将计数结果字典的键（中文词汇）转换为列表words，用于后续生成词云图。
     words = list(counts.keys())
@@ -46,60 +85,55 @@ def main():
 
     if url:
         try:
-            #调用crawl_webpage(url)函数，将爬取网页并统计词汇次数的结果保存在变量word_count中。
             word_count = crawl_webpage(url)
-            #将word_count字典的键转换为列表words，保存词汇
-
             words = list(word_count.keys())
-            # 将word_count字典的值转换为列表counts，保存词汇出现的次数。
             counts = list(word_count.values())
-            #使用Pandas库创建一个数据框df，其中word列保存词汇，count列保存词汇出现的次数。
             df = pd.DataFrame({'word': words, 'count': counts})
-            #获取出现次数最多的前15个词汇，并更新数据框df。
             df = df.nlargest(15, 'count')
-            #使用Streamlit库创建一个下拉选择框，让用户选择要展示的图表类型，并将用户选择的结果保存在变量chart_type中。
-            chart_type = st.selectbox('请选择图表类型：', ['饼图', '条形图', '折线图', '词云'])
+            chart_type = st.selectbox('请选择图表类型：', ['饼图', '条形图', '折线图', '词云', '回归图', '直方图', '成对关系图'])
 
-            if chart_type == '饼图':
-                #创建一个使用Altair库绘制饼图的图表，并将其赋值给变量chart
-                chart = alt.Chart(df).mark_arc().encode(
-                    color=alt.Color('word:N', scale=alt.Scale(scheme='category20b')),
-                    angle='count',#：设置饼图角度
-                    tooltip=['word', 'count']#设置鼠标悬停在饼图上时显示的提示信息，使用Altair库的tooltip参数，并指定显示word和count列的值。
-                ).properties(
-                    width=600,
-                    height=400,
-                    title="页面关键字分布"
-                )
+            if chart_type in ['饼图', '条形图', '折线图', '词云']:
+                if chart_type == '饼图':
+                    chart = alt.Chart(df).mark_arc().encode(
+                        color=alt.Color('word:N', scale=alt.Scale(scheme='category20b')),
+                        angle='count',
+                        tooltip=['word', 'count']
+                    ).properties(
+                        width=600,
+                        height=400,
+                        title="页面关键字分布"
+                    )
 
-            elif chart_type == '条形图':
-                #创建一个使用Altair库绘制条形图的图表，并将其赋值给变量chart
-                chart = alt.Chart(df).mark_bar().encode(
-                    x='count:Q',#设置条形图的横轴，
-                    y=alt.Y('word:N', sort='-x'),#设置条形图的纵轴，使用Altair库的y参数，以word列作为纵轴，并按照横轴倒序排列。
-                    tooltip=['word', 'count']
-                ).properties(
-                    width=1200,
-                    height=800,
-                    title="页面关键字数量"
-                )
+                elif chart_type == '条形图':
+                    chart = alt.Chart(df).mark_bar().encode(
+                        x='count:Q',
+                        y=alt.Y('word:N', sort='-x'),
+                        tooltip=['word', 'count']
+                    ).properties(
+                        width=1200,
+                        height=800,
+                        title="页面关键字数量"
+                    )
 
-            elif chart_type == '折线图':
-                chart = alt.Chart(df).mark_line().encode(
-                    x='word:N',
-                    y='count:Q',
-                    tooltip=['word', 'count']
-                ).properties(
-                    width=800,
-                    height=600,
-                    title="页面关键字趋势"
-                )
+                elif chart_type == '折线图':
+                    chart = alt.Chart(df).mark_line().encode(
+                        x='word:N',
+                        y='count:Q',
+                        tooltip=['word', 'count']
+                    ).properties(
+                        width=800,
+                        height=600,
+                        title="页面关键字趋势"
+                    )
 
-            elif chart_type == '词云':
-                generate_wordcloud(word_count)
-                return
+                elif chart_type == '词云':
+                    generate_wordcloud(word_count)
+                    return
 
-            st.altair_chart(chart)
+                st.altair_chart(chart)
+
+            else:
+                generate_seaborn_chart(chart_type, df)
 
         except requests.exceptions.RequestException as e:
             st.error(f"发生错误：{e}")
