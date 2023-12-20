@@ -8,7 +8,11 @@ from collections import Counter
 from wordcloud import WordCloud
 from streamlit_echarts import st_pyecharts
 import jieba
-import altair as alt
+from pyecharts.charts import Pie
+from pyecharts.charts import Line
+
+from pyecharts.charts import Bar
+from pyecharts import options as opts
 from pyecharts.charts import WordCloud as PyWordCloud
 
 #根据给定的URL爬取网页内容，并统计网页中出现的中文词汇的次数。
@@ -30,10 +34,10 @@ def crawl_webpage(url):
     words = jieba.cut(''.join(filtered_words))
     word_freq = Counter(words)
     word_freq = Counter({word: freq for word, freq in word_freq.items() if len(word) > 1})
-    print(word_freq)
+    # print(word_freq)
     return word_freq
 
-def generate_seaborn_chart(chart_type, df):
+def generate_chart(chart_type, df):
     if chart_type == '回归图':
         chart = alt.Chart(df).mark_circle().encode(
             x='count',
@@ -95,50 +99,59 @@ def main():
             counts = list(word_count.values())
             df = pd.DataFrame({'word': words, 'count': counts})
             df = df.nlargest(15, 'count')
-            chart_type = st.selectbox('请选择图表类型：', ['饼图', '条形图', '折线图', '词云', '回归图', '直方图', '成对关系图'])
 
-            if chart_type in ['饼图', '条形图', '折线图', '词云']:
+            chart_type = st.selectbox('请选择图表类型：', ['饼图', '条形图', '折线图', '词云', '回归图', '直方图', '成对关系图','动态线图','表格'])
+
+            if chart_type in ['饼图', '条形图', '折线图', '词云','动态线图','表格']:
                 if chart_type == '饼图':
-                    chart = alt.Chart(df).mark_arc().encode(
-                        color=alt.Color('word:N', scale=alt.Scale(scheme='category20b')),
-                        angle='count',
-                        tooltip=['word', 'count']
-                    ).properties(
-                        width=600,
-                        height=400,
-                        title="页面关键字分布"
-                    )
+                    chart = (
+                        Pie()
+                            .add('', list(zip(df['word'], df['count'])))
+                            .set_global_opts(title_opts=opts.TitleOpts(title='页面关键字分布', pos_top='top'), legend_opts=opts.LegendOpts(pos_top='bottom'))
+                            .set_series_opts(label_opts=opts.LabelOpts(formatter='{b}: {c}'))
+               )
+
+                    st_pyecharts(chart)
 
                 elif chart_type == '条形图':
-                    chart = alt.Chart(df).mark_bar().encode(
-                        x='count:Q',
-                        y=alt.Y('word:N', sort='-x'),
-                        tooltip=['word', 'count']
-                    ).properties(
-                        width=1200,
-                        height=800,
-                        title="页面关键字数量"
+                    chart = (
+                        Bar()
+                            .add_xaxis(df['word'].tolist())
+                            .add_yaxis('', df['count'].tolist())
+                            .set_global_opts(
+                            title_opts=opts.TitleOpts(title='页面关键字分布'),
+                            tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="shadow")
+
+                        )
                     )
+                    st_pyecharts(chart)
 
                 elif chart_type == '折线图':
-                    chart = alt.Chart(df).mark_line().encode(
-                        x='word:N',
-                        y='count:Q',
-                        tooltip=['word', 'count']
-                    ).properties(
-                        width=800,
-                        height=600,
-                        title="页面关键字趋势"
+                    chart = (
+                        Line()
+                            .add_xaxis(df['word'])
+                            .add_yaxis('', df['count'])
+                            .set_global_opts(
+                            title_opts=opts.TitleOpts(title='页面关键字趋势'),
+                            xaxis_opts=opts.AxisOpts(type_='category'),
+                            yaxis_opts=opts.AxisOpts(type_='value')
+                            )
                     )
-
+                    st_pyecharts(chart)
                 elif chart_type == '词云':
                     generate_wordcloud(word_count)
                     return
-
-                st.altair_chart(chart)
-
+                elif chart_type == '动态线图':
+                    # 添加动态线图
+                     st.line_chart(df['count'])
+                elif chart_type == '表格':
+                    # 显示表格内容
+                    st.dataframe(df)
             else:
-                generate_seaborn_chart(chart_type, df)
+                generate_chart(chart_type, df)
+
+
+
 
         except requests.exceptions.RequestException as e:
             st.error(f"发生错误：{e}")
