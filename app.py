@@ -25,8 +25,14 @@ def crawl_webpage(url):
     #使用Counter(matches)
     #对列表matches进行计数，生成一个字典counts，其中键是中文词汇，值是它在网页中出现的次数。
     matches = re.findall(pattern, text_content)
-    counts = Counter(matches)
-    return counts
+
+    filtered_words = [word for word in matches if len(word) > 1]
+    words = jieba.cut(''.join(filtered_words))
+    word_freq = Counter(words)
+    word_freq = Counter({word: freq for word, freq in word_freq.items() if len(word) > 1})
+    print(word_freq)
+    return word_freq
+
 def generate_seaborn_chart(chart_type, df):
     if chart_type == '回归图':
         chart = alt.Chart(df).mark_circle().encode(
